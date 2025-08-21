@@ -1,6 +1,7 @@
 const express = require("express");
-const puppeteer = require("puppeteer-core");
 const cors = require("cors");
+const chromium = require("chrome-aws-lambda");
+const puppeteer = require("puppeteer-core");
 
 const app = express();
 app.use(cors());
@@ -8,38 +9,31 @@ app.use(express.json());
 
 app.post("/scrape", async (req, res) => {
   const { url } = req.body;
-
-  if (!url) {
-    return res.status(400).json({ error: "Missing URL in request body" });
-  }
+  if (!url) return res.status(400).json({ error: "Missing URL" });
 
   try {
     const browser = await puppeteer.launch({
-      headless: "new",
-      executablePath: "/opt/render/.cache/puppeteer/chrome/chrome",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      args: chromium.args,
+      executablePath: await chromium.executablePath,
+      headless: chromium.headless,
     });
 
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
 
-    // Удалим скрипты/стили, чтобы они не мешали тексту
     await page.evaluate(() => {
       document
         .querySelectorAll("script, style, noscript")
         .forEach((el) => el.remove());
     });
 
-    const content = await page.evaluate(() => {
-      return document.body.innerText || "";
-    });
-
+    const text = await page.evaluate(() => document.body.innerText || "");
     await browser.close();
 
-    return res.json({ text: content.trim() });
+    res.json({ text: text.trim() });
   } catch (err) {
-    console.error("[SCRAPE ERROR]", err.message);
-    return res.status(500).json({ error: err.message });
+    console.error("[SCRAPE ERROR]", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
