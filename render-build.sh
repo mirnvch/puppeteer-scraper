@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# This script installs Chromium and moves it to Puppeteer's expected location
+# Установка Chromium вручную для Render
 
 echo "🔧 Installing Chromium manually..."
 apt-get update
