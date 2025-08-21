@@ -1,4 +1,3 @@
-// server.js
 const express = require("express");
 const puppeteer = require("puppeteer");
 const cors = require("cors");
@@ -11,29 +10,36 @@ app.post("/scrape", async (req, res) => {
   const { url } = req.body;
 
   if (!url) {
-    return res.status(400).json({ error: "URL is required" });
+    return res.status(400).json({ error: "Missing URL in request body" });
   }
 
   try {
-    const browser = await puppeteer.launch({ headless: "new" });
-    const page = await browser.newPage();
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      executablePath: puppeteer.executablePath(), // 💡 Важно для Render
+    });
 
+    const page = await browser.newPage();
     await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
 
-    // Удалим скрипты и стили, чтобы не мешали
+    // Удалим скрипты/стили, чтобы они не мешали тексту
     await page.evaluate(() => {
       document
         .querySelectorAll("script, style, noscript")
         .forEach((el) => el.remove());
     });
 
-    const content = await page.evaluate(() => document.body.innerText);
+    const content = await page.evaluate(() => {
+      return document.body.innerText || "";
+    });
 
     await browser.close();
 
-    res.json({ text: content });
+    return res.json({ text: content.trim() });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("[SCRAPE ERROR]", err.message);
+    return res.status(500).json({ error: err.message });
   }
 });
 
